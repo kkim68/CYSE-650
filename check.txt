@@ -1,0 +1,56 @@
+rm ~/.ssh/known_hosts
+ssh capstone-
+
+[TARPIT CHECK]
+
+1. As stated in the presentation, -sS scan is not affected by the tarpit.
+   However, service discovery scans will be delayed a lot.
+   Let's check if it really works. 
+
+   (FROM KALI)
+   There is no such host that has ip address of 10.0.2.50. It is just a tarpit that we configured.
+   nmap -sV 10.0.2.50 -p 22,80,443 -Pn 
+
+   However, if attacker conducs -sS scan, it will be captured by the Suricada IDS running in Bastion Host,
+   and will be reported to Splunk.
+   nmap -sS 10.0.2.0/24 -p 1-1000 -Pn
+
+
+[HONEYNET INBOUND PACKET]
+1. nmap -sV -sC 10.0.5.20 -Pn
+2. nmap -sS 10.0.5.20-23 -p 21,22,23,80,443 -Pn
+
+을 하면 bastion의 Suricata IDS가 픽업해서 SIEM에게 로그를 보냄.
+
+[HONEYPOT - credentials]
+ssh admin@10.0.5.20    # password: admin123
+ssh dbadmin@10.0.5.20  # password: password
+ssh backup@10.0.5.20   # password: backup123
+
+[HONEYPOT - find out running services]
+telnet 10.0.5.20
+curl http://10.0.5.20/
+
+
+[HONEYPOT - sensitive directories]
+curl http://10.0.5.20/admin/
+curl http://10.0.5.20/admin/credentials.txt
+curl http://10.0.5.20/admin/api_keys.txt
+
+curl http://10.0.5.20/documents/
+curl http://10.0.5.20/documents/customers.sql
+curl http://10.0.5.20/documents/financial_report.pdf
+curl http://10.0.5.20/documents/employees.xlsx
+
+curl http://10.0.5.20/backup/
+curl http://10.0.5.20/backup/backup_list.txt
+curl http://10.0.5.20/backup/config.tar.gz
+
+
+[HONEYPOT - Connect FTP Anonymous]
+ftp 10.0.5.20
+
+[Management Network]
+curl google.com
+
+

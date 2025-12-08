@@ -1,9 +1,13 @@
 kali_ami = "ami-014f91f72b49fb01b"
-vns3_ami = "ami-0dff1723f358493ae"
 
-aws_region      = "us-east-1"
-instance_type   = "t3.small"
+#vns3_ami = "ami-0dff1723f358493ae"
+vns3_ami = ""
 
-public_key = ""
+public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC4277PiKcKJp9LxyQTgelLP61JydNd0UX/SQvdS+nbaLIvsyapY+nZ8EGEe2PmMvDNxHmZkPnxKPqGLv3D03SvT5MKdlVk3cWvCJU6+8kjtgIiYr7kkef6KZ15yhGIW1FR73Z0fstyvRN+X+1G4jgacKCxYXbupeKqBUG64TFayVlWKcVIeZjKdQPIXohYiG6K9q/InQHEzqQMu4K9h5kX7shW3dL79hbUEFX7dTf505IfzN6/aMf3pY8ePafvmSkaHhaUkxhkho5IJ5N6if83P460s+K4QT0RDFE9bf0Sj3NRitvUAcsPjWawRbRqPDn4MnyDyuzTr3RkI48QZxI0tAPY0bIIak0kJXswGsH2K6HY4infgZYl2U9dckBtXYRSKyOXEjXxhxt+yNtbw8XQQ2QnRQNHFZHt9EyORukHrkqSxA92Ta0yrFhFIOlWosojIOVDk1EDK4xZeVKinLRRFbY06smrQtcxmZk3TCTbciQ1YyBFU7ENpeimqNv6G7epZ8lFhXJgE1qHRS4teBOD9U3a7OM2w1+BUSNNMsvwDCtjea2VkgrwIxSGCAvTswH7LPVuWXbchxS0+7167n3DmqQYA1rcG94YNeIVXuOLXYrwUKGLoK3lrMZpqwUvJdMxo9LWTrMGITkrM7G7WVsiWF2wYCSNB+HSnsoUj+77DQ== xsaprvd@Mac"
 
-allowed_ssh_cidr = "0.0.0.0"
+aws_region       = "us-east-1"
+instance_type    = "t3.micro"
+mirror_capable_instance_type = "t3.small"
+splunk_instance_type = "t3.medium"
+
+honeypot_count   = 4
