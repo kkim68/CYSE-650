@@ -10,4 +10,3 @@ terraform.tfstate.backup
 .terraform/providers/registry.terraform.io/hashicorp/aws/6.24.0/darwin_arm64/terraform-provider-aws_v6.24.0_x5
 backup/.DS_Store
 splunkforwarder-10.0.2-e2d18b4767e9.x86_64.rpm
-splunkforwarder-10.0.2-e2d18b4767e9.x86_64.rpm
