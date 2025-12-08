@@ -389,6 +389,15 @@ resource "aws_security_group" "splunk" {
     cidr_blocks = ["10.0.0.0/16"]
   }
 
+  # PCAP Streaming from Bastion
+  ingress {
+    from_port   = 9999
+    to_port     = 9999
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.2.0/24"]
+    description = "PCAP streaming from Bastion for network forensics"
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -688,39 +697,38 @@ SURICATA_EOF
     # Update Suricata rules
     suricata-update
     
-    
-    # Configure NFQUEUE for IPS
-    iptables -I FORWARD 3 -j NFQUEUE --queue-num 0 --queue-bypass
-    netfilter-persistent save
-    
-    # Start Suricata in IPS mode
-    systemctl start suricata
-    systemctl enable suricata
-    
-    # Install xtables-addons for TARPIT support
+    # Install xtables-addons for TARPIT support (before configuring iptables)
     apt-get install -y xtables-addons-common xtables-addons-dkms
     
     # Load TARPIT module
     modprobe xt_TARPIT
     
-    ############################
-    # TARPIT Configuration
-    # Packets from DMZ (ens5) destined for 10.0.2.0/25 get trapped
-    # This catches attackers scanning the "fake" network
-    ############################
-    # TARPIT in FORWARD chain - catches packets coming from ens5 (DMZ) to tarpit range
-    # Must be BEFORE NFQUEUE rule
-    iptables -I FORWARD 2 -i ens5 -d 10.0.2.0/25 -p tcp --syn -j TARPIT
-
-    # Allow Honeynet Access instead of sending it to IPS
-    iptables -I FORWARD 1 -i ens5 -d 10.0.5.0/24 -p tcp -j ACCEPT
-    
-    # Save iptables rules
-    netfilter-persistent save
-    
     # Make TARPIT module load on boot
     echo "xt_TARPIT" >> /etc/modules
+
+    ############################
+    # IPTABLES CONFIGURATION
+    # Configure all rules in correct order, then save once
+    ############################
     
+    # Clear existing FORWARD rules to ensure clean state
+    iptables -F FORWARD
+    
+    # Rule 1 (highest priority): Allow Honeynet access - bypass IPS for deception
+    iptables -A FORWARD -i ens5 -d 10.0.5.0/24 -p tcp -j ACCEPT
+    
+    # Rule 2: TARPIT for Transit network scanning - slow down attackers
+    iptables -A FORWARD -i ens5 -d 10.0.2.0/25 -p tcp --syn -j TARPIT
+    
+    # Rule 3: Send all other traffic to Suricata IPS via NFQUEUE
+    iptables -A FORWARD -j NFQUEUE --queue-num 0 --queue-bypass
+    
+    # Save iptables rules (only once, after all rules configured)
+    netfilter-persistent save
+    
+    # Start Suricata in IPS mode
+    systemctl start suricata
+    systemctl enable suricata
 
     # Create adaptive defense trigger script
     cat > /root/adaptive_trigger.sh <<'ADAPTIVE_EOF'
@@ -1044,6 +1052,34 @@ SURICATA_HONEYNET_RULES_EOF
     /opt/splunkforwarder/bin/splunk add monitor /var/log/suricata/ -auth admin:changeme
     /opt/splunkforwarder/bin/splunk add monitor /var/log/ufw.log -auth admin:changeme
     /opt/splunkforwarder/bin/splunk enable boot-start    
+
+    ############################
+    # PCAP STREAMING TO SIEM
+    ############################
+    # Install socat for reliable streaming
+    apt-get install -y socat
+
+    # Create systemd service for PCAP streaming to SIEM
+    cat > /etc/systemd/system/pcap-stream.service <<'PCAP_SERVICE_EOF'
+[Unit]
+Description=PCAP Stream to SIEM
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'tcpdump -i ens5 -U -w - 2>/dev/null | socat - TCP:${local.splunk_ip}:9999,forever,interval=10'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+PCAP_SERVICE_EOF
+
+    systemctl daemon-reload
+    systemctl enable pcap-stream.service
+    systemctl start pcap-stream.service
+
+    echo "PCAP streaming to SIEM enabled" >> /var/log/bastion_setup.log
     
     echo "Bastion with IDS configuration completed" > /var/log/bastion_setup_complete.log
   EOF
@@ -1112,10 +1148,47 @@ sudo -u splunk /opt/splunk/bin/splunk install app /opt/splunk/etc/apps/suricata 
 # Restart Splunk
 sudo -u splunk /opt/splunk/bin/splunk restart
 
+############################
+# PCAP RECEIVER FOR NETWORK FORENSICS
+############################
+# Install socat for reliable streaming
+apt-get install -y socat
+
+# Create PCAP storage directory
+mkdir -p /var/log/pcap
+chown splunk:splunk /var/log/pcap
+
+# Create systemd service for PCAP receiver
+cat > /etc/systemd/system/pcap-receiver.service <<'PCAP_RECV_EOF'
+[Unit]
+Description=PCAP Receiver from Bastion
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'while true; do socat TCP-LISTEN:9999,reuseaddr - >> /var/log/pcap/capture_$(date +%%Y%%m%%d).pcap 2>/dev/null; sleep 1; done'
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+PCAP_RECV_EOF
+
+systemctl daemon-reload
+systemctl enable pcap-receiver.service
+systemctl start pcap-receiver.service
+
+# Create index for PCAP metadata in Splunk
+sudo -u splunk /opt/splunk/bin/splunk add index pcap -auth admin:Capstone2025! || true
+
+echo "PCAP receiver service enabled" >> /var/log/splunk_setup.log
+
 echo "Splunk SIEM setup completed" > /var/log/splunk_setup_complete.log
 echo "Access Splunk at http://$(hostname -I | awk '{print $1}'):8000"
 echo "Username: admin"
 echo "Password: Capstone2025!"
+echo "PCAP files stored in /var/log/pcap/"
 EOF
 
   tags = { Name = "capstone-splunk-siem" }
@@ -1697,10 +1770,11 @@ output "network_summary" {
 output "security_architecture" {
   value = {
     router = "Suricata IPS (inline) + Tarpit (FORWARD chain, 10.0.2.0/25) + NAT Gateway"
-    bastion = "Suricata IDS (monitoring) + NAT for vmnet03/vmnet04"
-    siem = "Splunk Enterprise - receiving on port 9997"
+    bastion = "Suricata IDS (monitoring) + NAT for vmnet03/vmnet04 + PCAP streaming to SIEM"
+    siem = "Splunk Enterprise - receiving on port 9997 + PCAP receiver on port 9999"
     honeypots = "${var.honeypot_count} adaptive honeypots with honey tokens"
     traffic_mirroring = "All Router NICs mirrored to Bastion"
+    pcap_storage = "PCAP files stored at SIEM:/var/log/pcap/"
   }
   description = "Security architecture overview"
 }
