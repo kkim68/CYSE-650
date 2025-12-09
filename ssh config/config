@@ -1,0 +1,40 @@
+Host capstone-*
+  IdentitiesOnly yes
+  IdentityFile ~/.ssh/capstone-key
+
+Host capstone-kali
+    HostName 52.22.101.10
+    User kali
+
+Host capstone-router
+    HostName 52.71.24.219
+    User ubuntu
+    ForwardAgent yes
+
+Host capstone-honeypot
+    HostName 10.0.5.20
+    User ubuntu
+    Port 22222
+    ProxyJump capstone-router
+  
+Host capstone-bastion
+  HostName 10.0.2.129
+  User ubuntu
+  ProxyJump capstone-router
+
+Host capstone-splunk
+  HostName 10.0.3.50
+  User ubuntu
+  ProxyJump capstone-bastion
+
+Host capstone-splunk-gui-tunnel
+  HostName 10.0.3.50
+  User ubuntu
+  ProxyJump capstone-bastion
+  LocalForward 8000 localhost:8000
+
+Host capstone-classic-pc
+  HostName 10.0.4.130
+    User ubuntu
+    ProxyJump capstone-bastion
+

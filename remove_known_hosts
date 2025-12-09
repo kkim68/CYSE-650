@@ -1,3 +1,0 @@
-#!/bin/sh
-
-rm ~/.ssh/known_hosts
