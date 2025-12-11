@@ -50,11 +50,11 @@ FROM KALI,
    This will be super slow, since -sV switch waits for 3-way handshake to finish.
    This surely will step on the tarpit.
 
-2. But the half-open scan won't:
+2. But the half-open scan won't be delayed:
    nmap -sS 10.0.2.0/24 -p 1-1000 -Pn
 
-   However, this will show all ports to be open since IPTABLE tarpit module try to establish TCP connection,
-   and send SYN/ACK back to the attacker. This mechanism will confuse the attacker.
+   Instead, this will show all ports of all IP addresses to be open since IPTABLE tarpit module try to establish TCP connection,
+   which sends SYN/ACK packet back to the attacker. This mechanism will confuse the attacker.
 
 3. This won't be logged into Splunk at the moment, since I just didn't set it up, but we can always add IPTABLES Log as our log source as well.
 
