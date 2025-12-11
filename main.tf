@@ -647,7 +647,7 @@ echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-
 
 # Install necessary packages
 apt-get install -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" \
-  net-tools iptables-persistent suricata python3-pip jq curl wget
+  net-tools iptables-persistent suricata python3-pip jq curl wget nmap
 
 # Save iptables rules (now that iptables-persistent is installed)
 netfilter-persistent save
@@ -714,13 +714,25 @@ SURICATA_EOF
     # Clear existing FORWARD rules to ensure clean state
     iptables -F FORWARD
     
-    # Rule 1 (highest priority): Allow Honeynet access - bypass IPS for deception
-    iptables -A FORWARD -i ens5 -d 10.0.5.0/24 -p tcp -j ACCEPT
-    
-    # Rule 2: TARPIT for Transit network scanning - slow down attackers
+    # Rule 1: External → Honeypot Allow
+    iptables -A FORWARD -i ens5 -s 192.168.0.0/16 -d 10.0.5.0/24 -j ACCEPT
+
+    # Rule 2: Tarpit
     iptables -A FORWARD -i ens5 -d 10.0.2.0/25 -p tcp --syn -j TARPIT
-    
-    # Rule 3: Send all other traffic to Suricata IPS via NFQUEUE
+
+    # Rule 3: External → Internal Drop
+    iptables -A FORWARD -i ens5 -s 192.168.0.0/16 -d 10.0.0.0/16 -j LOG --log-prefix "KALI-BLOCKED: "
+    iptables -A FORWARD -i ens5 -s 192.168.0.0/16 -d 10.0.0.0/16 -j DROP
+
+    # Rule 4: Honeypot → Splunk Allow
+    iptables -A FORWARD -s 10.0.5.0/24 -d 10.0.3.50 -p tcp --dport 9997 -j ACCEPT
+    iptables -A FORWARD -s 10.0.5.0/24 -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+    # Rule 5: Honeypot → External Drop
+    iptables -A FORWARD -s 10.0.5.0/24 -j LOG --log-prefix "HONEYPOT-EGRESS-BLOCKED: "
+    iptables -A FORWARD -s 10.0.5.0/24 -j DROP
+
+    # Rule 6: IPS for remaining traffic
     iptables -A FORWARD -j NFQUEUE --queue-num 0 --queue-bypass
     
     # Save iptables rules (only once, after all rules configured)
