@@ -60,11 +60,11 @@ FROM KALI,
 
 
 [Management/Internal Network Outbound check]
-1. curl google.com
+1. nc 192.168.177.128 8282
 2. check Siem for log
-   src_ip=10.0.4.0/24| spath event_type | search event_type=alert
+   dest_ip=192.168.177.128 | spath event_type | search event_type=alert
+   
 
-
-[Streamed packets being stored into PCAP]
+[Show streamed packets being stored into PCAP]
 1. ps -ef | grep socat
 2. ls -alG /var/log/pcap
