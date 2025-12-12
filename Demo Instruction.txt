@@ -1,16 +1,13 @@
 rm ~/.ssh/known_hosts
-ssh capstone-
+
+ssh capstone-kali
 
 [ACCESIBILITY CHECK]
 1. ping 10.0.3.10
 2. ping 10.0.4.130
 3. nmap -sS 10.0.3.0/24
 4. nmap -sS 10.0.4.0/24
-   src_ip=192.168.177.128 | spath event_type | search event_type=alert
-
--> These won't be logged, since these are just attacks from some random external network.
--> If we start to log these kind of attacks in SIEM, it will be flooded with meaningless logs pretty soon.
-
+   
 [HONEYNET INBOUND PACKET]
 1. nmap -sS 10.0.5.20-23 -p 21,22,23,80,443 -Pn
 2. check SIEM for log
@@ -35,28 +32,12 @@ curl http://10.0.5.20/documents/employees.xlsx
 [HONEYNET ADAPTIVE DECEPTION]
 AGAIN, from Kali
 1. nmap -sS 10.0.5.20
-   This will show more ports to be open, which are actually just nc listening for such ports, and will deceive attacker to lure him to dig into honeypot even more.
-
 
 [TARPIT CHECK]
 FROM KALI,
 
-1. There is no such host that has ip address of 10.0.2.50.
-   I configured the tarpit to be ranged between 10.0.2.1~128 that we configured.
-   So when we do:
-   
-   nmap -sV 10.0.2.50 -p 22,80,443 -Pn 
-
-   This will be super slow, since -sV switch waits for 3-way handshake to finish.
-   This surely will step on the tarpit.
-
-2. But the half-open scan won't be delayed:
-   nmap -sS 10.0.2.0/24 -p 1-1000 -Pn
-
-   Instead, this will show all ports of all IP addresses to be open since IPTABLE tarpit module try to establish TCP connection,
-   which sends SYN/ACK packet back to the attacker. This mechanism will confuse the attacker.
-
-3. This won't be logged into Splunk at the moment, since I just didn't set it up, but we can always add IPTABLES Log as our log source as well.
+1. nmap -sV 10.0.2.50 -p 22,80,443 -Pn 
+2. nmap -sS 10.0.2.0/24 -p 1-1000 -Pn
 
 
 [Management/Internal Network Outbound check]
